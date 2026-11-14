@@ -1,0 +1,23 @@
+ "use client";
+import {useEffect,useMemo,useState} from "react";
+type Product={id:string;category:string;name_en:string;name_ar:string;name_zh:string;price:number;emoji:string};
+const words:any={en:{tag:"A LITTLE JOY IN EVERY CUP",menu:"Our Menu",cart:"Your Order",send:"Place order · Pay at counter",empty:"Your cart is empty",table:"Table",choose:"Choose language",success:"Order received! Please pay at the counter.",add:"Add",note:"Special request (optional)",sizes:"Cup size",sweet:"Sugar",ice:"Ice",extras:"Add-ons",categories:{drinks:"Drinks",mala:"Mala Tang",rice:"Rice & Meals",snacks:"Snacks"}},
+ar:{tag:"قليل من الفرح في كل كوب",menu:"قائمتنا",cart:"طلبك",send:"إرسال الطلب · الدفع عند الكاشير",empty:"السلة فارغة",table:"طاولة",choose:"اختر اللغة",success:"تم استلام طلبك! يرجى الدفع عند الكاشير.",add:"أضف",note:"ملاحظات (اختياري)",sizes:"حجم الكوب",sweet:"السكر",ice:"الثلج",extras:"إضافات",categories:{drinks:"المشروبات",mala:"مالا تانغ",rice:"الأرز والوجبات",snacks:"وجبات خفيفة"}},
+zh:{tag:"每一杯，都有一点喜悦",menu:"商品菜单",cart:"购物车",send:"提交订单 · 到柜台付款",empty:"购物车还是空的",table:"桌号",choose:"选择语言",success:"订单已收到！请到柜台付款。",add:"加入",note:"特殊备注（选填）",sizes:"杯型",sweet:"甜度",ice:"冰量",extras:"加料",categories:{drinks:"饮品",mala:"麻辣烫",rice:"饭类",snacks:"小吃"}}};
+export default function Home(){
+ const [lang,setLang]=useState("en"),[products,setProducts]=useState<Product[]>([]),[cart,setCart]=useState<any[]>([]),[note,setNote]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
+ const table=new URLSearchParams(typeof window!=="undefined"?window.location.search:"").get("table")||"01";
+ const t=words[lang],rtl=lang==="ar";
+ useEffect(()=>{fetch("/api/products").then(r=>r.json()).then(d=>setProducts(Array.isArray(d)?d:[])).catch(()=>setMessage("Could not load menu."));},[]);
+ const add=(p:Product)=>setCart(old=>{const found=old.find(x=>x.product_id===p.id);return found?old.map(x=>x.product_id===p.id?{...x,quantity:x.quantity+1}:x):[...old,{product_id:p.id,quantity:1,options:{size:"500ml",sugar:"50%",ice:"regular",extras:[]}}]});
+ const total=useMemo(()=>cart.reduce((s,x)=>s+(products.find(p=>p.id===x.product_id)?.price||0)*x.quantity,0),[cart,products]);
+ async function submit(){if(!cart.length)return;setBusy(true);setMessage("");try{const r=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({table,items:cart,language:lang,note})});const d=await r.json();if(!r.ok)throw new Error(d.error);setMessage(`${t.success} #${String(d.id).slice(0,8)} · ${Number(d.total).toFixed(2)} JOD`);setCart([]);setNote("");}catch(e:any){setMessage(e.message||"Order failed");}finally{setBusy(false);}}
+ const name=(p:Product)=>lang==="ar"?(p.name_ar||p.name_en):lang==="zh"?(p.name_zh||p.name_en):p.name_en;
+ const groups=["drinks","mala","rice","snacks"];
+ return <main className={`wrap ${rtl?"rtl":""}`}><header><div className="brand">JOY TEAHOUSE</div><div className="sub">{t.tag}</div><div className="top"><span className="muted">{t.table} {table}</span><div>{(["en","ar","zh"] as const).map(x=><button key={x} className={`pill ${lang===x?"active":""}`} onClick={()=>setLang(x)}>{x==="en"?"English":x==="ar"?"العربية":"中文"}</button>)}</div></div></header>
+ <section className="hero"><h1>{t.menu}</h1><div className="muted">Freshly made · Made with joy</div></section>
+ {groups.map(g=>{const list=products.filter(p=>p.category===g);return list.length?<section className="section" key={g}><h2>{t.categories[g]}</h2><div className="grid">{list.map(p=><article className="card" key={p.id}><div className="emoji">{p.emoji}</div><h3>{name(p)}</h3><div className="row"><span className="price">{Number(p.price).toFixed(2)} JOD</span><button onClick={()=>add(p)}>{t.add} +</button></div></article>)}</div></section>:null})}
+ <section className="cart"><div className="row"><strong>{t.cart} ({cart.reduce((s,x)=>s+x.quantity,0)})</strong><strong>{total.toFixed(2)} JOD</strong></div>{cart.length?cart.map(x=>{const p=products.find(p=>p.id===x.product_id);return <div className="row" key={x.product_id}><span>{p?name(p):""} × {x.quantity}</span><span><button onClick={()=>setCart(c=>c.map(y=>y.product_id===x.product_id?{...y,quantity:Math.max(0,y.quantity-1)}:y).filter(y=>y.quantity))}>−</button> <button onClick={()=>add(p!)}>+</button></span></div>}):<p>{t.empty}</p>}
+ <textarea className="field" placeholder={t.note} value={note} onChange={e=>setNote(e.target.value)}/><button disabled={!cart.length||busy} onClick={submit}>{busy?"Sending…":t.send}</button></section>
+ {message&&<p className="card" role="status">{message}</p>}<footer className="sub">JOY TEAHOUSE · Thank you</footer></main>;
+}
