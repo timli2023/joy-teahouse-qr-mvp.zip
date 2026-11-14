@@ -25,7 +25,7 @@ export async function POST(req:Request) {
       payment_status:"unpaid",status:"new",customer_note:String(body.note||"").slice(0,300),language:["en","ar","zh"].includes(body.language)?body.language:"en"
     }).select().single();
     if(oe) throw oe;
-    const {error:ie}=await client.from("order_items").insert(lines.map(x=>({...x,order_id:order.id})));
+    const {error:ie}=await client.from("order_items").insert(lines.map(x:any)=>({...x,order_id:order.id})));
     if(ie) throw ie;
     return NextResponse.json({id:order.id,total:order.total_amount,table:order.table_number});
   } catch(e:any) { return NextResponse.json({error:e.message||"Could not place order."},{status:500}); }
